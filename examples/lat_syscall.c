@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/stat.h>
+#include <linux/ktime.h>
 
 MODULE_LICENSE("GPL");
 
@@ -41,9 +42,26 @@ MODULE_PARM_DESC(mystring, "A character string");
 module_param_array(myintarray, int, &arr_argc, 0000);
 MODULE_PARM_DESC(myintarray, "An array of integers");
 
-static int __init hello_5_init(void)
+static ktime_t k_now(void)
+{
+    return ktime_get();
+}
+static int k_start(ktime_t * const starttime) {*starttime = k_now(); return 0;}
+static int k_end(ktime_t * const rettime, ktime_t const starttime) {
+    ktime_t ret = k_now();
+    *rettime = ktime_sub(ret, starttime);
+    return 0;
+}
+
+static int __init lat_syscall_init(void)
 {
     int i;
+    ktime_t start = 0, during = 0;
+
+    k_start(&start);
+    pr_info("start in ktime: %lld\n", start);
+    pr_info("during in ms: %lld ms", ktime_to_ms(start));
+    pr_info("during in ns: %lld ns", ktime_to_ns(start));
 
     pr_info("Hello, world 5\n=============\n");
     pr_info("myshort is a short integer: %hd\n", myshort);
@@ -55,13 +73,19 @@ static int __init hello_5_init(void)
         pr_info("myintarray[%d] = %d\n", i, myintarray[i]);
 
     pr_info("got %d arguments for myintarray.\n", arr_argc);
+
+    k_end(&during, start);
+    pr_info("during in ktime: %lld\n", during);
+    pr_info("during in ms: %lld ms", ktime_to_ms(during));
+    pr_info("during in ns: %lld ns", ktime_to_ns(during));
+
     return 0;
 }
 
-static void __exit hello_5_exit(void)
+static void __exit lat_syscall_exit(void)
 {
     pr_info("Goodbye, world 5\n");
 }
 
-module_init(hello_5_init);
-module_exit(hello_5_exit);
+module_init(lat_syscall_init);
+module_exit(lat_syscall_exit);
